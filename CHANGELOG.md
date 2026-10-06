@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.4
+
+- Reads an exact key range such as `20-21` from the native search box.
+- Keeps only dungeons whose next upgrade target falls inside the entered range.
+- Sorts matching listings by target level and dungeon while retaining duplicate-class filtering.
+- Marks guaranteed upgrades with a green row when a single-level range such as `20-20` is used.
+
 ## 1.0.3
 
 - Removed the exact-range search requirement.

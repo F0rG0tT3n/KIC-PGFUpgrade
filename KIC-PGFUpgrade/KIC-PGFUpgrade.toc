@@ -1,8 +1,8 @@
 ## Interface: 120100
 ## Title: KIC PGF Upgrade
-## Notes: Shows each dungeon's next upgrade target and filters duplicate classes.
+## Notes: Sorts upgrade targets in a searched key range and filters duplicate classes.
 ## Author: KIC
-## Version: 1.0.3
+## Version: 1.0.4
 ## Category: KIC
 ## OptionalDeps: PremadeGroupsFilter
 ## SavedVariables: KICPGFUpgradeDB

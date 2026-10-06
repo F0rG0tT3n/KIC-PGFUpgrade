@@ -43,6 +43,30 @@ local function SafeNumber(value)
     return value
 end
 
+local function GetSearchLevelRange()
+    if not searchPanel or not searchPanel.SearchBox then
+        return nil, nil
+    end
+
+    local searchText = searchPanel.SearchBox:GetText()
+    if not IsSafeValue(searchText) or type(searchText) ~= "string" then
+        return nil, nil
+    end
+
+    local minimumLevel, maximumLevel = searchText:match("^%s*%+?(%d+)%s*[-:]%s*%+?(%d+)%s*$")
+    minimumLevel = tonumber(minimumLevel)
+    maximumLevel = tonumber(maximumLevel)
+    if not minimumLevel or not maximumLevel then
+        return nil, nil
+    end
+
+    if minimumLevel > maximumLevel then
+        minimumLevel, maximumLevel = maximumLevel, minimumLevel
+    end
+
+    return minimumLevel, maximumLevel
+end
+
 local function GetBestLevel(runInfo)
     if not IsAccessibleTable(runInfo) then
         return 0
@@ -166,7 +190,7 @@ local function GetResultTargetLevel(searchResultInfo)
             if activityID then
                 local challengeMapID = GetChallengeMapID(activityID)
                 if challengeMapID then
-                    return targetByChallengeID[challengeMapID]
+                    return targetByChallengeID[challengeMapID], challengeMapID
                 end
             end
         end
@@ -176,7 +200,11 @@ local function GetResultTargetLevel(searchResultInfo)
 
     local activityID = SafeNumber(searchResultInfo.activityID)
     local challengeMapID = activityID and GetChallengeMapID(activityID)
-    return challengeMapID and targetByChallengeID[challengeMapID] or nil
+    if challengeMapID then
+        return targetByChallengeID[challengeMapID], challengeMapID
+    end
+
+    return nil, nil
 end
 
 local function ResultHasPlayerClass(resultID, numMembers)
@@ -227,7 +255,7 @@ local function ResultHasPlayerClass(resultID, numMembers)
     return false
 end
 
-local function ResultPasses(resultID)
+local function ResultPasses(resultID, minimumLevel, maximumLevel)
     local searchResultInfo = C_LFGList.GetSearchResultInfo(resultID)
     if not IsAccessibleTable(searchResultInfo) then
         return false
@@ -237,7 +265,20 @@ local function ResultPasses(resultID)
         return false
     end
 
-    return ResultHasPlayerClass(resultID, searchResultInfo.numMembers) == false
+    local targetLevel, challengeMapID = GetResultTargetLevel(searchResultInfo)
+    if not targetLevel then
+        return false
+    end
+
+    if minimumLevel and (targetLevel < minimumLevel or targetLevel > maximumLevel) then
+        return false
+    end
+
+    if ResultHasPlayerClass(resultID, searchResultInfo.numMembers) ~= false then
+        return false
+    end
+
+    return true, targetLevel, challengeMapID
 end
 
 local function IsFilterActive()
@@ -291,11 +332,42 @@ local function ApplyFilter(panel)
 
     local filteredResults = {}
     local resultSeen = {}
-    for _, resultID in ipairs(panel.results) do
-        if IsSafeValue(resultID) and ResultPasses(resultID) then
+    local resultOrder = {}
+    local resultTargets = {}
+    local resultMaps = {}
+    local minimumLevel, maximumLevel = GetSearchLevelRange()
+
+    for originalIndex, resultID in ipairs(panel.results) do
+        local passes, targetLevel, challengeMapID
+        if IsSafeValue(resultID) then
+            passes, targetLevel, challengeMapID = ResultPasses(resultID, minimumLevel, maximumLevel)
+        end
+
+        if passes then
             filteredResults[#filteredResults + 1] = resultID
             resultSeen[resultID] = true
+            resultOrder[resultID] = originalIndex
+            resultTargets[resultID] = targetLevel
+            resultMaps[resultID] = challengeMapID or 0
         end
+    end
+
+    if minimumLevel then
+        table.sort(filteredResults, function(leftResultID, rightResultID)
+            local leftTarget = resultTargets[leftResultID]
+            local rightTarget = resultTargets[rightResultID]
+            if leftTarget ~= rightTarget then
+                return leftTarget < rightTarget
+            end
+
+            local leftMap = resultMaps[leftResultID]
+            local rightMap = resultMaps[rightResultID]
+            if leftMap ~= rightMap then
+                return leftMap < rightMap
+            end
+
+            return resultOrder[leftResultID] < resultOrder[rightResultID]
+        end)
     end
 
     panel.results = filteredResults
@@ -331,9 +403,10 @@ local function ShowButtonTooltip(button)
         AddTooltipLine("Kikapcsolva", 1, 0.82, 0)
     end
 
-    AddTooltipLine("Kiszűri a nem Mythic+ találatokat, és minden sornál kiírja az adott dungeon következő upgrade-szintjét.", 0.9, 0.9, 0.9)
+    AddTooltipLine("A keresőbe írt tartományon belül csak azokat a dungeonöket mutatja, amelyek következő upgrade-szintje beleesik a tartományba.", 0.9, 0.9, 0.9)
     AddTooltipLine("Kiszűri azokat a csoportokat, amelyekben már van a karaktereddel azonos class.", 0.9, 0.9, 0.9)
-    AddTooltipLine("A célértéket hasonlítsd a találat címében látható kulcsszinthez.", 0.55, 0.75, 1)
+    AddTooltipLine("A találatokat célszint szerint rendezi, és minden soron jelöli a szükséges szintet.", 0.55, 0.75, 1)
+    AddTooltipLine("Példa: 20-21. Pontos tartománynál (20-20) a tényleges upgrade sor zöld.", 0.25, 1, 0.55)
     AddTooltipLine("Ha még nincs teljesített kulcsod, a cél +2.", 0.7, 0.7, 0.7)
 
     if targetsReady and #targetRows > 0 then
@@ -372,28 +445,49 @@ local function UpdateResultTargetBadge(button)
         local targetText = button:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         targetText:SetPoint("TOPRIGHT", button, "TOPRIGHT", -128, -6)
         targetText:SetJustifyH("RIGHT")
-        targetText:SetTextColor(0.25, 1, 0.55)
         button.KICUpgradeTarget = targetText
+
+        local highlight = button:CreateTexture(nil, "OVERLAY", nil, -7)
+        highlight:SetAllPoints(button)
+        highlight:SetColorTexture(0.1, 0.8, 0.25, 0.12)
+        highlight:Hide()
+        button.KICUpgradeHighlight = highlight
     end
 
     local targetText = button.KICUpgradeTarget
     if not IsFilterActive() or not button.resultID then
         targetText:Hide()
+        button.KICUpgradeHighlight:Hide()
         return
     end
 
     local searchResultInfo = C_LFGList.GetSearchResultInfo(button.resultID)
     if not IsAccessibleTable(searchResultInfo) then
         targetText:Hide()
+        button.KICUpgradeHighlight:Hide()
         return
     end
 
     local targetLevel = GetResultTargetLevel(searchResultInfo)
     if targetLevel then
-        targetText:SetText("CÉL +" .. targetLevel)
+        local minimumLevel, maximumLevel = GetSearchLevelRange()
+        local isExactUpgrade = minimumLevel
+            and minimumLevel == maximumLevel
+            and targetLevel == minimumLevel
+
+        if isExactUpgrade then
+            targetText:SetText("UPGRADE +" .. targetLevel)
+            targetText:SetTextColor(0.25, 1, 0.35)
+            button.KICUpgradeHighlight:Show()
+        else
+            targetText:SetText("CÉL +" .. targetLevel)
+            targetText:SetTextColor(1, 0.82, 0)
+            button.KICUpgradeHighlight:Hide()
+        end
         targetText:Show()
     else
         targetText:Hide()
+        button.KICUpgradeHighlight:Hide()
     end
 end
 
