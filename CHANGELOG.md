@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.8
+
+- Sorts matching groups by the leader's overall Mythic+ score in descending order.
+- Uses upgrade target, dungeon and original result order as stable tie-breakers.
+
 ## 1.0.7
 
 - Removed the redundant `[CÉL +N]` badge.

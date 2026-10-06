@@ -278,7 +278,8 @@ local function ResultPasses(resultID, minimumLevel, maximumLevel)
         return false
     end
 
-    return true, targetLevel, challengeMapID
+    local leaderScore = SafeNumber(searchResultInfo.leaderOverallDungeonScore) or 0
+    return true, targetLevel, challengeMapID, leaderScore
 end
 
 local function IsFilterActive()
@@ -335,12 +336,13 @@ local function ApplyFilter(panel)
     local resultOrder = {}
     local resultTargets = {}
     local resultMaps = {}
+    local resultScores = {}
     local minimumLevel, maximumLevel = GetSearchLevelRange()
 
     for originalIndex, resultID in ipairs(panel.results) do
-        local passes, targetLevel, challengeMapID
+        local passes, targetLevel, challengeMapID, leaderScore
         if IsSafeValue(resultID) then
-            passes, targetLevel, challengeMapID = ResultPasses(resultID, minimumLevel, maximumLevel)
+            passes, targetLevel, challengeMapID, leaderScore = ResultPasses(resultID, minimumLevel, maximumLevel)
         end
 
         if passes then
@@ -349,26 +351,31 @@ local function ApplyFilter(panel)
             resultOrder[resultID] = originalIndex
             resultTargets[resultID] = targetLevel
             resultMaps[resultID] = challengeMapID or 0
+            resultScores[resultID] = leaderScore or 0
         end
     end
 
-    if minimumLevel then
-        table.sort(filteredResults, function(leftResultID, rightResultID)
-            local leftTarget = resultTargets[leftResultID]
-            local rightTarget = resultTargets[rightResultID]
-            if leftTarget ~= rightTarget then
-                return leftTarget < rightTarget
-            end
+    table.sort(filteredResults, function(leftResultID, rightResultID)
+        local leftScore = resultScores[leftResultID]
+        local rightScore = resultScores[rightResultID]
+        if leftScore ~= rightScore then
+            return leftScore > rightScore
+        end
 
-            local leftMap = resultMaps[leftResultID]
-            local rightMap = resultMaps[rightResultID]
-            if leftMap ~= rightMap then
-                return leftMap < rightMap
-            end
+        local leftTarget = resultTargets[leftResultID]
+        local rightTarget = resultTargets[rightResultID]
+        if leftTarget ~= rightTarget then
+            return leftTarget < rightTarget
+        end
 
-            return resultOrder[leftResultID] < resultOrder[rightResultID]
-        end)
-    end
+        local leftMap = resultMaps[leftResultID]
+        local rightMap = resultMaps[rightResultID]
+        if leftMap ~= rightMap then
+            return leftMap < rightMap
+        end
+
+        return resultOrder[leftResultID] < resultOrder[rightResultID]
+    end)
 
     panel.results = filteredResults
 
@@ -405,7 +412,7 @@ local function ShowButtonTooltip(button)
 
     AddTooltipLine("A keresőbe írt tartományon belül csak azokat a dungeonöket mutatja, amelyek következő upgrade-szintje beleesik a tartományba.", 0.9, 0.9, 0.9)
     AddTooltipLine("Kiszűri azokat a csoportokat, amelyekben már van a karaktereddel azonos class.", 0.9, 0.9, 0.9)
-    AddTooltipLine("A találatokat célszint szerint rendezi.", 0.55, 0.75, 1)
+    AddTooltipLine("A találatokat a leader Mythic+ score-ja szerint rendezi, legmagasabbtól lefelé.", 0.55, 0.75, 1)
     AddTooltipLine("Példa: 20-21. Pontos tartománynál (20-20) a tényleges upgrade [UPGRADE +N] jelölést kap.", 0.25, 1, 0.55)
     AddTooltipLine("Ha még nincs teljesített kulcsod, a cél +2.", 0.7, 0.7, 0.7)
 
