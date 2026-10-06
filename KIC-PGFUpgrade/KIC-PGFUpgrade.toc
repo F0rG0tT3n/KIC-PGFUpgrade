@@ -1,8 +1,8 @@
 ## Interface: 120100
 ## Title: KIC PGF Upgrade
-## Notes: Shows exact +1 Mythic+ upgrades without duplicate classes.
+## Notes: Filters Mythic+ upgrade searches and groups with duplicate classes.
 ## Author: KIC
-## Version: 1.0.1
+## Version: 1.0.2
 ## Category: KIC
 ## OptionalDeps: PremadeGroupsFilter
 ## SavedVariables: KICPGFUpgradeDB

@@ -128,9 +128,9 @@ local function GetChallengeMapID(activityID)
     return challengeByInstanceMapID[mapID] or (targetByChallengeID[mapID] and mapID) or nil
 end
 
-local function ActivityMatchesUpgrade(activityID)
+local function ActivityMatchesUpgrade(activityID, exactSearchLevel)
     activityID = SafeNumber(activityID)
-    if not activityID or not C_LFGList.GetKeystoneForActivity then
+    if not activityID then
         return false
     end
 
@@ -139,15 +139,14 @@ local function ActivityMatchesUpgrade(activityID)
         return false
     end
 
-    local listedLevel = SafeNumber(C_LFGList.GetKeystoneForActivity(activityID))
-    return listedLevel ~= nil and listedLevel == targetByChallengeID[challengeMapID]
+    return exactSearchLevel == nil or targetByChallengeID[challengeMapID] == exactSearchLevel
 end
 
-local function ResultMatchesUpgrade(searchResultInfo)
+local function ResultMatchesUpgrade(searchResultInfo, exactSearchLevel)
     local activityIDs = searchResultInfo.activityIDs
     if IsAccessibleTable(activityIDs) then
         for _, activityID in ipairs(activityIDs) do
-            if ActivityMatchesUpgrade(activityID) then
+            if ActivityMatchesUpgrade(activityID, exactSearchLevel) then
                 return true
             end
         end
@@ -156,10 +155,40 @@ local function ResultMatchesUpgrade(searchResultInfo)
     end
 
     -- Compatibility with clients that expose one activity ID instead of activityIDs.
-    return ActivityMatchesUpgrade(searchResultInfo.activityID)
+    return ActivityMatchesUpgrade(searchResultInfo.activityID, exactSearchLevel)
+end
+
+local function GetExactSearchLevel()
+    if not searchPanel or not searchPanel.SearchBox then
+        return nil
+    end
+
+    local searchText = searchPanel.SearchBox:GetText()
+    if not IsSafeValue(searchText) or type(searchText) ~= "string" then
+        return nil
+    end
+
+    local minimumLevel, maximumLevel = searchText:match("^%s*%+?(%d+)%s*[-:]%s*%+?(%d+)%s*$")
+    minimumLevel = tonumber(minimumLevel)
+    maximumLevel = tonumber(maximumLevel)
+    if minimumLevel and minimumLevel == maximumLevel then
+        return minimumLevel
+    end
+
+    return nil
 end
 
 local function ResultHasPlayerClass(resultID, numMembers)
+    if C_LFGList.GetSearchResultMemberCounts then
+        local memberCounts = C_LFGList.GetSearchResultMemberCounts(resultID)
+        if IsAccessibleTable(memberCounts) then
+            local classCount = SafeNumber(memberCounts[playerClass])
+            if classCount ~= nil then
+                return classCount > 0
+            end
+        end
+    end
+
     numMembers = SafeNumber(numMembers)
     if not numMembers then
         return nil
@@ -197,13 +226,13 @@ local function ResultHasPlayerClass(resultID, numMembers)
     return false
 end
 
-local function ResultPasses(resultID)
+local function ResultPasses(resultID, exactSearchLevel)
     local searchResultInfo = C_LFGList.GetSearchResultInfo(resultID)
     if not IsAccessibleTable(searchResultInfo) then
         return false
     end
 
-    if not ResultMatchesUpgrade(searchResultInfo) then
+    if not ResultMatchesUpgrade(searchResultInfo, exactSearchLevel) then
         return false
     end
 
@@ -261,8 +290,9 @@ local function ApplyFilter(panel)
 
     local filteredResults = {}
     local resultSeen = {}
+    local exactSearchLevel = GetExactSearchLevel()
     for _, resultID in ipairs(panel.results) do
-        if IsSafeValue(resultID) and ResultPasses(resultID) then
+        if IsSafeValue(resultID) and ResultPasses(resultID, exactSearchLevel) then
             filteredResults[#filteredResults + 1] = resultID
             resultSeen[resultID] = true
         end
@@ -301,8 +331,9 @@ local function ShowButtonTooltip(button)
         AddTooltipLine("Kikapcsolva", 1, 0.82, 0)
     end
 
-    AddTooltipLine("Csak a dungeonönkénti szezoncsúcsodnál pontosan eggyel magasabb Mythic+ kulcsokat mutatja.", 0.9, 0.9, 0.9)
+    AddTooltipLine("Kiszűri a nem Mythic+ találatokat és azokat a dungeonöket, amelyekhez nem a beírt pontos szint a következő upgrade-ed.", 0.9, 0.9, 0.9)
     AddTooltipLine("Kiszűri azokat a csoportokat, amelyekben már van a karaktereddel azonos class.", 0.9, 0.9, 0.9)
+    AddTooltipLine("Pontos +1 listához keress tartománnyal, például: 20-20.", 0.55, 0.75, 1)
     AddTooltipLine("Ha még nincs teljesített kulcsod, a cél +2.", 0.7, 0.7, 0.7)
 
     if targetsReady and #targetRows > 0 then
@@ -327,6 +358,9 @@ local function ToggleFilter()
 
     if KICPGFUpgradeDB.enabled then
         Print("a +1 szűrő bekapcsolva.")
+        if not GetExactSearchLevel() then
+            Print("pontos +1 listához írj be egy pontos tartományt, például: 20-20.")
+        end
     else
         Print("a +1 szűrő kikapcsolva.")
     end
@@ -335,16 +369,25 @@ end
 local function CreateToggleButton(panel)
     toggleButton = CreateFrame("Button", "KICPGFUpgradeButton", panel, "UIPanelButtonTemplate")
     toggleButton:SetSize(64, 22)
-    if panel.CategoryName then
-        toggleButton:SetPoint("LEFT", panel.CategoryName, "RIGHT", 8, 0)
-    else
-        toggleButton:SetPoint("TOPLEFT", panel, "TOPLEFT", 104, -25)
-    end
     toggleButton:SetFrameLevel(panel:GetFrameLevel() + 10)
     toggleButton:SetScript("OnClick", ToggleFilter)
     toggleButton:SetScript("OnEnter", ShowButtonTooltip)
     toggleButton:SetScript("OnLeave", GameTooltip_Hide)
     UpdateButton()
+end
+
+local function PositionToggleButton(panel)
+    if not toggleButton then
+        return
+    end
+
+    toggleButton:ClearAllPoints()
+    if panel.CategoryName then
+        local titleWidth = math.ceil(panel.CategoryName:GetStringWidth() or 0)
+        toggleButton:SetPoint("LEFT", panel.CategoryName, "LEFT", titleWidth + 8, 0)
+    else
+        toggleButton:SetPoint("TOPLEFT", panel, "TOPLEFT", 104, -31)
+    end
 end
 
 local function InitializeGroupFinder()
@@ -357,6 +400,7 @@ local function InitializeGroupFinder()
     currentCategoryID = SafeNumber(searchPanel.categoryID)
 
     CreateToggleButton(searchPanel)
+    PositionToggleButton(searchPanel)
 
     hooksecurefunc("LFGListSearchPanel_SetCategory", function(panel, categoryID)
         if panel ~= searchPanel then
@@ -364,6 +408,7 @@ local function InitializeGroupFinder()
         end
 
         currentCategoryID = SafeNumber(categoryID)
+        PositionToggleButton(panel)
         UpdateButton()
     end)
 

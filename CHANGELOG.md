@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.2
+
+- Fixed the toggle position so it follows the rendered `Dungeons` title instead of the title frame's full width.
+- Removed the invalid `GetKeystoneForActivity` result-level check that hid every listing.
+- Uses the game's exact key-range search together with each dungeon's next upgrade target.
+- Keeps Mythic+ and duplicate-class filtering active when no exact key range is entered.
+
 ## 1.0.1
 
 - Moved the `KIC +1` toggle directly beside the native Dungeon search heading.
