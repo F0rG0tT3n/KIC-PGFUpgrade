@@ -1,0 +1,10 @@
+## Interface: 120100
+## Title: KIC PGF Upgrade
+## Notes: Shows exact +1 Mythic+ upgrades without duplicate classes.
+## Author: KIC
+## Version: 1.0.0
+## Category: KIC
+## OptionalDeps: PremadeGroupsFilter
+## SavedVariables: KICPGFUpgradeDB
+
+KIC-PGFUpgrade.lua
