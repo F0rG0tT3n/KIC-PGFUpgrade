@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.3
+
+- Removed the exact-range search requirement.
+- Shows the calculated next upgrade level beside every Mythic+ result.
+- Keeps automatic Mythic+ and duplicate-class filtering without requiring search-box input.
+
 ## 1.0.2
 
 - Fixed the toggle position so it follows the rendered `Dungeons` title instead of the title frame's full width.

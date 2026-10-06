@@ -128,7 +128,7 @@ local function GetChallengeMapID(activityID)
     return challengeByInstanceMapID[mapID] or (targetByChallengeID[mapID] and mapID) or nil
 end
 
-local function ActivityMatchesUpgrade(activityID, exactSearchLevel)
+local function ActivityMatchesUpgrade(activityID)
     activityID = SafeNumber(activityID)
     if not activityID then
         return false
@@ -139,14 +139,14 @@ local function ActivityMatchesUpgrade(activityID, exactSearchLevel)
         return false
     end
 
-    return exactSearchLevel == nil or targetByChallengeID[challengeMapID] == exactSearchLevel
+    return true
 end
 
-local function ResultMatchesUpgrade(searchResultInfo, exactSearchLevel)
+local function ResultMatchesUpgrade(searchResultInfo)
     local activityIDs = searchResultInfo.activityIDs
     if IsAccessibleTable(activityIDs) then
         for _, activityID in ipairs(activityIDs) do
-            if ActivityMatchesUpgrade(activityID, exactSearchLevel) then
+            if ActivityMatchesUpgrade(activityID) then
                 return true
             end
         end
@@ -155,27 +155,28 @@ local function ResultMatchesUpgrade(searchResultInfo, exactSearchLevel)
     end
 
     -- Compatibility with clients that expose one activity ID instead of activityIDs.
-    return ActivityMatchesUpgrade(searchResultInfo.activityID, exactSearchLevel)
+    return ActivityMatchesUpgrade(searchResultInfo.activityID)
 end
 
-local function GetExactSearchLevel()
-    if not searchPanel or not searchPanel.SearchBox then
+local function GetResultTargetLevel(searchResultInfo)
+    local activityIDs = searchResultInfo.activityIDs
+    if IsAccessibleTable(activityIDs) then
+        for _, activityID in ipairs(activityIDs) do
+            activityID = SafeNumber(activityID)
+            if activityID then
+                local challengeMapID = GetChallengeMapID(activityID)
+                if challengeMapID then
+                    return targetByChallengeID[challengeMapID]
+                end
+            end
+        end
+
         return nil
     end
 
-    local searchText = searchPanel.SearchBox:GetText()
-    if not IsSafeValue(searchText) or type(searchText) ~= "string" then
-        return nil
-    end
-
-    local minimumLevel, maximumLevel = searchText:match("^%s*%+?(%d+)%s*[-:]%s*%+?(%d+)%s*$")
-    minimumLevel = tonumber(minimumLevel)
-    maximumLevel = tonumber(maximumLevel)
-    if minimumLevel and minimumLevel == maximumLevel then
-        return minimumLevel
-    end
-
-    return nil
+    local activityID = SafeNumber(searchResultInfo.activityID)
+    local challengeMapID = activityID and GetChallengeMapID(activityID)
+    return challengeMapID and targetByChallengeID[challengeMapID] or nil
 end
 
 local function ResultHasPlayerClass(resultID, numMembers)
@@ -226,13 +227,13 @@ local function ResultHasPlayerClass(resultID, numMembers)
     return false
 end
 
-local function ResultPasses(resultID, exactSearchLevel)
+local function ResultPasses(resultID)
     local searchResultInfo = C_LFGList.GetSearchResultInfo(resultID)
     if not IsAccessibleTable(searchResultInfo) then
         return false
     end
 
-    if not ResultMatchesUpgrade(searchResultInfo, exactSearchLevel) then
+    if not ResultMatchesUpgrade(searchResultInfo) then
         return false
     end
 
@@ -290,9 +291,8 @@ local function ApplyFilter(panel)
 
     local filteredResults = {}
     local resultSeen = {}
-    local exactSearchLevel = GetExactSearchLevel()
     for _, resultID in ipairs(panel.results) do
-        if IsSafeValue(resultID) and ResultPasses(resultID, exactSearchLevel) then
+        if IsSafeValue(resultID) and ResultPasses(resultID) then
             filteredResults[#filteredResults + 1] = resultID
             resultSeen[resultID] = true
         end
@@ -331,9 +331,9 @@ local function ShowButtonTooltip(button)
         AddTooltipLine("Kikapcsolva", 1, 0.82, 0)
     end
 
-    AddTooltipLine("Kiszűri a nem Mythic+ találatokat és azokat a dungeonöket, amelyekhez nem a beírt pontos szint a következő upgrade-ed.", 0.9, 0.9, 0.9)
+    AddTooltipLine("Kiszűri a nem Mythic+ találatokat, és minden sornál kiírja az adott dungeon következő upgrade-szintjét.", 0.9, 0.9, 0.9)
     AddTooltipLine("Kiszűri azokat a csoportokat, amelyekben már van a karaktereddel azonos class.", 0.9, 0.9, 0.9)
-    AddTooltipLine("Pontos +1 listához keress tartománnyal, például: 20-20.", 0.55, 0.75, 1)
+    AddTooltipLine("A célértéket hasonlítsd a találat címében látható kulcsszinthez.", 0.55, 0.75, 1)
     AddTooltipLine("Ha még nincs teljesített kulcsod, a cél +2.", 0.7, 0.7, 0.7)
 
     if targetsReady and #targetRows > 0 then
@@ -358,11 +358,42 @@ local function ToggleFilter()
 
     if KICPGFUpgradeDB.enabled then
         Print("a +1 szűrő bekapcsolva.")
-        if not GetExactSearchLevel() then
-            Print("pontos +1 listához írj be egy pontos tartományt, például: 20-20.")
-        end
     else
         Print("a +1 szűrő kikapcsolva.")
+    end
+end
+
+local function UpdateResultTargetBadge(button)
+    if not button then
+        return
+    end
+
+    if not button.KICUpgradeTarget then
+        local targetText = button:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        targetText:SetPoint("TOPRIGHT", button, "TOPRIGHT", -128, -6)
+        targetText:SetJustifyH("RIGHT")
+        targetText:SetTextColor(0.25, 1, 0.55)
+        button.KICUpgradeTarget = targetText
+    end
+
+    local targetText = button.KICUpgradeTarget
+    if not IsFilterActive() or not button.resultID then
+        targetText:Hide()
+        return
+    end
+
+    local searchResultInfo = C_LFGList.GetSearchResultInfo(button.resultID)
+    if not IsAccessibleTable(searchResultInfo) then
+        targetText:Hide()
+        return
+    end
+
+    local targetLevel = GetResultTargetLevel(searchResultInfo)
+    if targetLevel then
+        targetText:SetText("CÉL +" .. targetLevel)
+        targetText:Show()
+    else
+        targetText:Hide()
     end
 end
 
@@ -415,6 +446,8 @@ local function InitializeGroupFinder()
     hooksecurefunc("LFGListSearchPanel_UpdateResultList", function(panel)
         ApplyFilter(panel)
     end)
+
+    hooksecurefunc("LFGListSearchEntry_Update", UpdateResultTargetBadge)
 end
 
 local function InitializeAddon()
