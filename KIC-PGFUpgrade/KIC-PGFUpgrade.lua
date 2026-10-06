@@ -443,7 +443,7 @@ local function UpdateResultTargetBadge(button)
 
     if not button.KICUpgradeTarget then
         local targetText = button:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        targetText:SetPoint("TOPRIGHT", button, "TOPRIGHT", -128, -6)
+        targetText:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -10, 6)
         targetText:SetJustifyH("RIGHT")
         button.KICUpgradeTarget = targetText
 

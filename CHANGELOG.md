@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.5
+
+- Moved the upgrade badge to the lower-right corner of each result row so it no longer overlaps the leader's Mythic+ rating.
+
 ## 1.0.4
 
 - Reads an exact key range such as `20-21` from the native search box.
