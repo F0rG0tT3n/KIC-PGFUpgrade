@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.9
+
+- Added Party Fit filtering for every tank, healer and damage role in the current party.
+- Added Bloodlust Fit filtering compatible with Premade Groups Filter behavior.
+- Refreshes filtered results when the party roster, assigned roles or player specialization changes.
+
 ## 1.0.8
 
 - Sorts matching groups by the leader's overall Mythic+ score in descending order.

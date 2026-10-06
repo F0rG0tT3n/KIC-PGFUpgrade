@@ -1,8 +1,8 @@
 ## Interface: 120100
 ## Title: KIC PGF Upgrade
-## Notes: Sorts upgrade groups by leader Mythic+ score and filters duplicate classes.
+## Notes: Filters upgrade groups by class, party roles and Bloodlust fit.
 ## Author: KIC
-## Version: 1.0.8
+## Version: 1.0.9
 ## Category: KIC
 ## OptionalDeps: PremadeGroupsFilter
 ## SavedVariables: KICPGFUpgradeDB

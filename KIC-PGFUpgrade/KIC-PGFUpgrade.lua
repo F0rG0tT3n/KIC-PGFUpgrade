@@ -2,6 +2,17 @@ local ADDON_NAME = ...
 
 local DUNGEON_CATEGORY_ID = 2
 local MIN_KEYSTONE_LEVEL = 2
+local ROLE_REMAINING_KEYS = {
+    TANK = "TANK_REMAINING",
+    HEALER = "HEALER_REMAINING",
+    DAMAGER = "DAMAGER_REMAINING",
+}
+local BLOODLUST_CLASSES = {
+    EVOKER = true,
+    HUNTER = true,
+    MAGE = true,
+    SHAMAN = true,
+}
 
 local issecretvalue = issecretvalue or function()
     return false
@@ -207,14 +218,127 @@ local function GetResultTargetLevel(searchResultInfo)
     return nil, nil
 end
 
-local function ResultHasPlayerClass(resultID, numMembers)
-    if C_LFGList.GetSearchResultMemberCounts then
-        local memberCounts = C_LFGList.GetSearchResultMemberCounts(resultID)
-        if IsAccessibleTable(memberCounts) then
-            local classCount = SafeNumber(memberCounts[playerClass])
-            if classCount ~= nil then
-                return classCount > 0
-            end
+local function GetUnitRole(unit)
+    local role = UnitGroupRolesAssigned(unit)
+    if not IsSafeValue(role) or type(role) ~= "string" or role == "NONE" then
+        return "DAMAGER"
+    end
+
+    if ROLE_REMAINING_KEYS[role] then
+        return role
+    end
+
+    return "DAMAGER"
+end
+
+local function GetPlayerSpecializationRole()
+    local specializationIndex = GetSpecialization()
+    if not specializationIndex then
+        return "DAMAGER"
+    end
+
+    local role = GetSpecializationRole(specializationIndex)
+    if not IsSafeValue(role) or not ROLE_REMAINING_KEYS[role] then
+        return "DAMAGER"
+    end
+
+    return role
+end
+
+local function ForEachCurrentGroupUnit(callback)
+    local numGroupMembers = GetNumGroupMembers()
+    if numGroupMembers == 0 then
+        callback("player")
+        return
+    end
+
+    if IsInRaid() then
+        for memberIndex = 1, numGroupMembers do
+            callback("raid" .. memberIndex)
+        end
+        return
+    end
+
+    callback("player")
+    for memberIndex = 1, numGroupMembers - 1 do
+        callback("party" .. memberIndex)
+    end
+end
+
+local function GetCurrentPartyRoles()
+    local partyRoles = {
+        TANK = 0,
+        HEALER = 0,
+        DAMAGER = 0,
+    }
+
+    if GetNumGroupMembers() == 0 then
+        partyRoles[GetPlayerSpecializationRole()] = 1
+        return partyRoles
+    end
+
+    ForEachCurrentGroupUnit(function(unit)
+        local role = GetUnitRole(unit)
+        partyRoles[role] = partyRoles[role] + 1
+    end)
+
+    return partyRoles
+end
+
+local function CurrentPartyHasBloodlust()
+    local hasBloodlust = false
+    ForEachCurrentGroupUnit(function(unit)
+        if hasBloodlust then
+            return
+        end
+
+        local _, classFilename = UnitClass(unit)
+        if IsSafeValue(classFilename) and BLOODLUST_CLASSES[classFilename] then
+            hasBloodlust = true
+        end
+    end)
+
+    return hasBloodlust
+end
+
+local function ListedGroupHasBloodlust(memberCounts)
+    for classFilename in pairs(BLOODLUST_CLASSES) do
+        local classCount = SafeNumber(memberCounts[classFilename])
+        if classCount and classCount > 0 then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function PartyAndBloodlustFit(memberCounts, partyRoles, partyHasBloodlust)
+    if not IsAccessibleTable(memberCounts) then
+        return false
+    end
+
+    local remainingAfterJoin = {}
+    for role, remainingKey in pairs(ROLE_REMAINING_KEYS) do
+        local remainingSlots = SafeNumber(memberCounts[remainingKey])
+        if remainingSlots == nil or remainingSlots < partyRoles[role] then
+            return false
+        end
+
+        remainingAfterJoin[role] = remainingSlots - partyRoles[role]
+    end
+
+    if partyHasBloodlust or ListedGroupHasBloodlust(memberCounts) then
+        return true
+    end
+
+    return remainingAfterJoin.HEALER > 0 or remainingAfterJoin.DAMAGER > 0
+end
+
+local function ResultHasPlayerClass(resultID, numMembers, memberCounts)
+    if IsAccessibleTable(memberCounts) then
+        local classCount = SafeNumber(memberCounts[playerClass])
+        if classCount ~= nil then
+            return classCount > 0
         end
     end
 
@@ -255,7 +379,7 @@ local function ResultHasPlayerClass(resultID, numMembers)
     return false
 end
 
-local function ResultPasses(resultID, minimumLevel, maximumLevel)
+local function ResultPasses(resultID, minimumLevel, maximumLevel, partyRoles, partyHasBloodlust)
     local searchResultInfo = C_LFGList.GetSearchResultInfo(resultID)
     if not IsAccessibleTable(searchResultInfo) then
         return false
@@ -274,7 +398,16 @@ local function ResultPasses(resultID, minimumLevel, maximumLevel)
         return false
     end
 
-    if ResultHasPlayerClass(resultID, searchResultInfo.numMembers) ~= false then
+    local memberCounts
+    if C_LFGList.GetSearchResultMemberCounts then
+        memberCounts = C_LFGList.GetSearchResultMemberCounts(resultID)
+    end
+
+    if not PartyAndBloodlustFit(memberCounts, partyRoles, partyHasBloodlust) then
+        return false
+    end
+
+    if ResultHasPlayerClass(resultID, searchResultInfo.numMembers, memberCounts) ~= false then
         return false
     end
 
@@ -338,11 +471,19 @@ local function ApplyFilter(panel)
     local resultMaps = {}
     local resultScores = {}
     local minimumLevel, maximumLevel = GetSearchLevelRange()
+    local partyRoles = GetCurrentPartyRoles()
+    local partyHasBloodlust = CurrentPartyHasBloodlust()
 
     for originalIndex, resultID in ipairs(panel.results) do
         local passes, targetLevel, challengeMapID, leaderScore
         if IsSafeValue(resultID) then
-            passes, targetLevel, challengeMapID, leaderScore = ResultPasses(resultID, minimumLevel, maximumLevel)
+            passes, targetLevel, challengeMapID, leaderScore = ResultPasses(
+                resultID,
+                minimumLevel,
+                maximumLevel,
+                partyRoles,
+                partyHasBloodlust
+            )
         end
 
         if passes then
@@ -412,6 +553,8 @@ local function ShowButtonTooltip(button)
 
     AddTooltipLine("A keresőbe írt tartományon belül csak azokat a dungeonöket mutatja, amelyek következő upgrade-szintje beleesik a tartományba.", 0.9, 0.9, 0.9)
     AddTooltipLine("Kiszűri azokat a csoportokat, amelyekben már van a karaktereddel azonos class.", 0.9, 0.9, 0.9)
+    AddTooltipLine("Csak olyan csoportot mutat, amelybe a teljes jelenlegi party szerepkörei beférnek.", 0.9, 0.9, 0.9)
+    AddTooltipLine("Bloodlust nélkül csak akkor enged át egy csoportot, ha belépés után marad healer- vagy DPS-hely Bloodlustos classnak.", 0.9, 0.9, 0.9)
     AddTooltipLine("A találatokat a leader Mythic+ score-ja szerint rendezi, legmagasabbtól lefelé.", 0.55, 0.75, 1)
     AddTooltipLine("Példa: 20-21. Pontos tartománynál (20-20) a tényleges upgrade [UPGRADE +N] jelölést kap.", 0.25, 1, 0.55)
     AddTooltipLine("Ha még nincs teljesített kulcsod, a cél +2.", 0.7, 0.7, 0.7)
@@ -574,6 +717,10 @@ frame:RegisterEvent("ADDON_LOADED")
 frame:RegisterEvent("PLAYER_ENTERING_WORLD")
 frame:RegisterEvent("CHALLENGE_MODE_MAPS_UPDATE")
 frame:RegisterEvent("CHALLENGE_MODE_COMPLETED")
+frame:RegisterEvent("GROUP_ROSTER_UPDATE")
+frame:RegisterEvent("PLAYER_ROLES_ASSIGNED")
+frame:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
+frame:RegisterEvent("ROLE_CHANGED_INFORM")
 
 frame:SetScript("OnEvent", function(_, event, arg1)
     if event == "ADDON_LOADED" then
@@ -581,6 +728,18 @@ frame:SetScript("OnEvent", function(_, event, arg1)
             InitializeAddon()
         elseif arg1 == "Blizzard_GroupFinder" then
             InitializeGroupFinder()
+        end
+        return
+    end
+
+    if event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_ROLES_ASSIGNED" or event == "ROLE_CHANGED_INFORM" then
+        RefreshResults()
+        return
+    end
+
+    if event == "PLAYER_SPECIALIZATION_CHANGED" then
+        if not arg1 or arg1 == "player" then
+            RefreshResults()
         end
         return
     end
