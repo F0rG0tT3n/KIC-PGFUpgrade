@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.1
+
+- Moved the `KIC +1` toggle directly beside the native Dungeon search heading.
+- Avoided overlap with Premade Groups Filter controls in the upper-right corner.
+
 ## 1.0.0
 
 - Added a `KIC +1` toggle to the Premade Group Finder dungeon search.

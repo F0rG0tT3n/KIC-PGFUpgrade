@@ -335,7 +335,11 @@ end
 local function CreateToggleButton(panel)
     toggleButton = CreateFrame("Button", "KICPGFUpgradeButton", panel, "UIPanelButtonTemplate")
     toggleButton:SetSize(64, 22)
-    toggleButton:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -31, -25)
+    if panel.CategoryName then
+        toggleButton:SetPoint("LEFT", panel.CategoryName, "RIGHT", 8, 0)
+    else
+        toggleButton:SetPoint("TOPLEFT", panel, "TOPLEFT", 104, -25)
+    end
     toggleButton:SetFrameLevel(panel:GetFrameLevel() + 10)
     toggleButton:SetScript("OnClick", ToggleFilter)
     toggleButton:SetScript("OnEnter", ShowButtonTooltip)
