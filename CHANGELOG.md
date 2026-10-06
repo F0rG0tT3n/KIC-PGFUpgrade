@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.6
+
+- Removed the full-row green highlight so upgrade markers cannot be confused with Blizzard's application status colors.
+- Added bracketed `[UPGRADE +N]` and `[CÉL +N]` badges.
+
 ## 1.0.5
 
 - Moved the upgrade badge to the lower-right corner of each result row so it no longer overlaps the leader's Mythic+ rating.

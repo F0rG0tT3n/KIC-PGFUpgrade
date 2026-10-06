@@ -406,7 +406,7 @@ local function ShowButtonTooltip(button)
     AddTooltipLine("A keresőbe írt tartományon belül csak azokat a dungeonöket mutatja, amelyek következő upgrade-szintje beleesik a tartományba.", 0.9, 0.9, 0.9)
     AddTooltipLine("Kiszűri azokat a csoportokat, amelyekben már van a karaktereddel azonos class.", 0.9, 0.9, 0.9)
     AddTooltipLine("A találatokat célszint szerint rendezi, és minden soron jelöli a szükséges szintet.", 0.55, 0.75, 1)
-    AddTooltipLine("Példa: 20-21. Pontos tartománynál (20-20) a tényleges upgrade sor zöld.", 0.25, 1, 0.55)
+    AddTooltipLine("Példa: 20-21. Pontos tartománynál (20-20) a tényleges upgrade [UPGRADE +N] jelölést kap.", 0.25, 1, 0.55)
     AddTooltipLine("Ha még nincs teljesített kulcsod, a cél +2.", 0.7, 0.7, 0.7)
 
     if targetsReady and #targetRows > 0 then
@@ -446,25 +446,17 @@ local function UpdateResultTargetBadge(button)
         targetText:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -10, 6)
         targetText:SetJustifyH("RIGHT")
         button.KICUpgradeTarget = targetText
-
-        local highlight = button:CreateTexture(nil, "OVERLAY", nil, -7)
-        highlight:SetAllPoints(button)
-        highlight:SetColorTexture(0.1, 0.8, 0.25, 0.12)
-        highlight:Hide()
-        button.KICUpgradeHighlight = highlight
     end
 
     local targetText = button.KICUpgradeTarget
     if not IsFilterActive() or not button.resultID then
         targetText:Hide()
-        button.KICUpgradeHighlight:Hide()
         return
     end
 
     local searchResultInfo = C_LFGList.GetSearchResultInfo(button.resultID)
     if not IsAccessibleTable(searchResultInfo) then
         targetText:Hide()
-        button.KICUpgradeHighlight:Hide()
         return
     end
 
@@ -476,18 +468,13 @@ local function UpdateResultTargetBadge(button)
             and targetLevel == minimumLevel
 
         if isExactUpgrade then
-            targetText:SetText("UPGRADE +" .. targetLevel)
-            targetText:SetTextColor(0.25, 1, 0.35)
-            button.KICUpgradeHighlight:Show()
+            targetText:SetText("[UPGRADE +" .. targetLevel .. "]")
         else
-            targetText:SetText("CÉL +" .. targetLevel)
-            targetText:SetTextColor(1, 0.82, 0)
-            button.KICUpgradeHighlight:Hide()
+            targetText:SetText("[CÉL +" .. targetLevel .. "]")
         end
         targetText:Show()
     else
         targetText:Hide()
-        button.KICUpgradeHighlight:Hide()
     end
 end
 
