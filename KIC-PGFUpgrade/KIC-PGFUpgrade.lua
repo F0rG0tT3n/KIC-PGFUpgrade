@@ -405,7 +405,7 @@ local function ShowButtonTooltip(button)
 
     AddTooltipLine("A keresőbe írt tartományon belül csak azokat a dungeonöket mutatja, amelyek következő upgrade-szintje beleesik a tartományba.", 0.9, 0.9, 0.9)
     AddTooltipLine("Kiszűri azokat a csoportokat, amelyekben már van a karaktereddel azonos class.", 0.9, 0.9, 0.9)
-    AddTooltipLine("A találatokat célszint szerint rendezi, és minden soron jelöli a szükséges szintet.", 0.55, 0.75, 1)
+    AddTooltipLine("A találatokat célszint szerint rendezi.", 0.55, 0.75, 1)
     AddTooltipLine("Példa: 20-21. Pontos tartománynál (20-20) a tényleges upgrade [UPGRADE +N] jelölést kap.", 0.25, 1, 0.55)
     AddTooltipLine("Ha még nincs teljesített kulcsod, a cél +2.", 0.7, 0.7, 0.7)
 
@@ -469,10 +469,11 @@ local function UpdateResultTargetBadge(button)
 
         if isExactUpgrade then
             targetText:SetText("[UPGRADE +" .. targetLevel .. "]")
+            targetText:SetTextColor(0.25, 1, 0.35)
+            targetText:Show()
         else
-            targetText:SetText("[CÉL +" .. targetLevel .. "]")
+            targetText:Hide()
         end
-        targetText:Show()
     else
         targetText:Hide()
     end

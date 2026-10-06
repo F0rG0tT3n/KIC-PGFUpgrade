@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.7
+
+- Removed the redundant `[CÉL +N]` badge.
+- Keeps the `[UPGRADE +N]` badge in green for guaranteed upgrades without changing the result row background.
+
 ## 1.0.6
 
 - Removed the full-row green highlight so upgrade markers cannot be confused with Blizzard's application status colors.

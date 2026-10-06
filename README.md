@@ -7,13 +7,13 @@ When enabled, it:
 - reads a key range such as `20-21` from the native search box;
 - keeps dungeons whose next upgrade level falls inside that range;
 - sorts the remaining listings by their target level and dungeon;
-- shows the character's next upgrade level beside every remaining listing;
+- marks guaranteed upgrades in exact, single-level searches;
 - uses +2 for dungeons without a completed seasonal key;
 - excludes groups that already contain the logged-in character's class.
 
-Enter the level range you are currently browsing, for example `20-21`, then enable `KIC +1`. The game restricts the results to that range, while the addon keeps and sorts the dungeons with an upgrade target in it. A `[CÉL +21]` badge shows the required level. With an exact range such as `20-20`, every returned listing has a known level, so an actual upgrade is marked with an `[UPGRADE +20]` badge.
+Enter the level range you are currently browsing, for example `20-21`, then enable `KIC +1`. The game restricts the results to that range, while the addon keeps and sorts the dungeons with an upgrade target in it. With an exact range such as `20-20`, every returned listing has a known level, so an actual upgrade is marked with a green `[UPGRADE +20]` badge.
 
-World of Warcraft does not expose each listing's exact key level to addons as a readable result field. In a multi-level range, compare the `[CÉL +N]` badge with the key level visible in the listing title; the addon cannot distinguish a `+20` row from a `+21` row inside the same `20-21` search.
+World of Warcraft does not expose each listing's exact key level to addons as a readable result field. The addon can filter and sort upgrade dungeons in a multi-level range, but it only displays the `[UPGRADE +N]` badge for a single-level search where the result level is guaranteed.
 
 Premade Groups Filter is supported as an optional dependency. When both addons are installed, KIC PGF Upgrade applies its rules after the active Premade Groups Filter rules.
 

@@ -2,7 +2,7 @@
 ## Title: KIC PGF Upgrade
 ## Notes: Sorts upgrade targets in a searched key range and filters duplicate classes.
 ## Author: KIC
-## Version: 1.0.6
+## Version: 1.0.7
 ## Category: KIC
 ## OptionalDeps: PremadeGroupsFilter
 ## SavedVariables: KICPGFUpgradeDB
