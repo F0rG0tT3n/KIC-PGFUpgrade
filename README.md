@@ -6,7 +6,8 @@ When enabled, it:
 
 - reads a key range such as `20-21` from the native search box;
 - keeps dungeons whose next upgrade level falls inside that range;
-- sorts the remaining listings by the group leader's Mythic+ score, highest first;
+- keeps active applications that still fit at the top, followed by applications that no longer fit;
+- sorts the remaining, not-yet-applied listings by the group leader's Mythic+ score, highest first;
 - marks guaranteed upgrades in exact, single-level searches;
 - uses +2 for dungeons without a completed seasonal key;
 - excludes groups that already contain the logged-in character's class;

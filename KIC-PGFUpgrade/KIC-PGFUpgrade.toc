@@ -2,7 +2,7 @@
 ## Title: KIC PGF Upgrade
 ## Notes: Filters upgrade groups by class, party roles and Bloodlust fit.
 ## Author: KIC
-## Version: 1.0.9
+## Version: 1.0.10
 ## Category: KIC
 ## OptionalDeps: PremadeGroupsFilter
 ## SavedVariables: KICPGFUpgradeDB

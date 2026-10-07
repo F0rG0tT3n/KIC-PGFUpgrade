@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.10
+
+- Sorts active applications that still fit to the top.
+- Keeps applications that no longer fit directly below the active fitting applications.
+- Sorts the remaining, not-yet-applied listings by leader Mythic+ score in descending order.
+
 ## 1.0.9
 
 - Added Party Fit filtering for every tank, healer and damage role in the current party.

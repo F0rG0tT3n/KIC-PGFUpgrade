@@ -13,6 +13,15 @@ local BLOODLUST_CLASSES = {
     MAGE = true,
     SHAMAN = true,
 }
+local INACTIVE_APPLICATION_STATUSES = {
+    cancelled = true,
+    declined = true,
+    declined_delisted = true,
+    declined_full = true,
+    failed = true,
+    invitedeclined = true,
+    timedout = true,
+}
 
 local issecretvalue = issecretvalue or function()
     return false
@@ -415,6 +424,36 @@ local function ResultPasses(resultID, minimumLevel, maximumLevel, partyRoles, pa
     return true, targetLevel, challengeMapID, leaderScore
 end
 
+local function ApplicationStillFits(resultID, partyRoles, partyHasBloodlust)
+    local _, applicationStatus, pendingStatus = C_LFGList.GetApplicationInfo(resultID)
+    if not IsSafeValue(applicationStatus) or not IsSafeValue(pendingStatus) then
+        return false
+    end
+
+    if INACTIVE_APPLICATION_STATUSES[applicationStatus]
+        or INACTIVE_APPLICATION_STATUSES[pendingStatus]
+    then
+        return false
+    end
+
+    local searchResultInfo = C_LFGList.GetSearchResultInfo(resultID)
+    if not IsAccessibleTable(searchResultInfo) then
+        return false
+    end
+
+    local isDelisted = searchResultInfo.isDelisted
+    if not IsSafeValue(isDelisted) or isDelisted then
+        return false
+    end
+
+    if not C_LFGList.GetSearchResultMemberCounts then
+        return false
+    end
+
+    local memberCounts = C_LFGList.GetSearchResultMemberCounts(resultID)
+    return PartyAndBloodlustFit(memberCounts, partyRoles, partyHasBloodlust)
+end
+
 local function IsFilterActive()
     return KICPGFUpgradeDB
         and KICPGFUpgradeDB.enabled
@@ -464,8 +503,10 @@ local function ApplyFilter(panel)
 
     applyingFilter = true
 
+    local fittingApplications = {}
+    local nonFittingApplications = {}
+    local applicationSet = {}
     local filteredResults = {}
-    local resultSeen = {}
     local resultOrder = {}
     local resultTargets = {}
     local resultMaps = {}
@@ -474,9 +515,22 @@ local function ApplyFilter(panel)
     local partyRoles = GetCurrentPartyRoles()
     local partyHasBloodlust = CurrentPartyHasBloodlust()
 
+    if IsAccessibleTable(panel.applications) then
+        for _, resultID in ipairs(panel.applications) do
+            if IsSafeValue(resultID) and not applicationSet[resultID] then
+                applicationSet[resultID] = true
+                if ApplicationStillFits(resultID, partyRoles, partyHasBloodlust) then
+                    fittingApplications[#fittingApplications + 1] = resultID
+                else
+                    nonFittingApplications[#nonFittingApplications + 1] = resultID
+                end
+            end
+        end
+    end
+
     for originalIndex, resultID in ipairs(panel.results) do
         local passes, targetLevel, challengeMapID, leaderScore
-        if IsSafeValue(resultID) then
+        if IsSafeValue(resultID) and not applicationSet[resultID] then
             passes, targetLevel, challengeMapID, leaderScore = ResultPasses(
                 resultID,
                 minimumLevel,
@@ -488,7 +542,6 @@ local function ApplyFilter(panel)
 
         if passes then
             filteredResults[#filteredResults + 1] = resultID
-            resultSeen[resultID] = true
             resultOrder[resultID] = originalIndex
             resultTargets[resultID] = targetLevel
             resultMaps[resultID] = challengeMapID or 0
@@ -518,17 +571,19 @@ local function ApplyFilter(panel)
         return resultOrder[leftResultID] < resultOrder[rightResultID]
     end)
 
-    panel.results = filteredResults
-
-    local totalResults = #filteredResults
-    if IsAccessibleTable(panel.applications) then
-        for _, resultID in ipairs(panel.applications) do
-            if IsSafeValue(resultID) and not resultSeen[resultID] then
-                totalResults = totalResults + 1
-            end
-        end
+    local orderedResults = {}
+    for _, resultID in ipairs(fittingApplications) do
+        orderedResults[#orderedResults + 1] = resultID
     end
-    panel.totalResults = totalResults
+    for _, resultID in ipairs(nonFittingApplications) do
+        orderedResults[#orderedResults + 1] = resultID
+    end
+    for _, resultID in ipairs(filteredResults) do
+        orderedResults[#orderedResults + 1] = resultID
+    end
+
+    panel.results = orderedResults
+    panel.totalResults = #orderedResults
 
     if LFGListSearchPanel_UpdateResults then
         LFGListSearchPanel_UpdateResults(panel)
@@ -555,7 +610,7 @@ local function ShowButtonTooltip(button)
     AddTooltipLine("Kiszűri azokat a csoportokat, amelyekben már van a karaktereddel azonos class.", 0.9, 0.9, 0.9)
     AddTooltipLine("Csak olyan csoportot mutat, amelybe a teljes jelenlegi party szerepkörei beférnek.", 0.9, 0.9, 0.9)
     AddTooltipLine("Bloodlust nélkül csak akkor enged át egy csoportot, ha belépés után marad healer- vagy DPS-hely Bloodlustos classnak.", 0.9, 0.9, 0.9)
-    AddTooltipLine("A találatokat a leader Mythic+ score-ja szerint rendezi, legmagasabbtól lefelé.", 0.55, 0.75, 1)
+    AddTooltipLine("Rendezés: megfelelő jelentkezések, már nem megfelelő jelentkezések, majd a többi group leader score szerint.", 0.55, 0.75, 1)
     AddTooltipLine("Példa: 20-21. Pontos tartománynál (20-20) a tényleges upgrade [UPGRADE +N] jelölést kap.", 0.25, 1, 0.55)
     AddTooltipLine("Ha még nincs teljesített kulcsod, a cél +2.", 0.7, 0.7, 0.7)
 
